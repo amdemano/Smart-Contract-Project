@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.18;
+
+contract ExampleContract {
+
+    uint256 public data;
+
+    function setData(uint256 _data) public {
+        require(_data > 0, "Data must be greater than zero.");
+        data = _data;
+    }
+
+    function divide(uint256  _a, uint256  _b) public pure returns (uint256){
+        require(_b > 0, "Division by zero is not allowed.");
+        uint256 result = _a / _b;
+        assert((result * _b) == _a);
+        return result;
+    }
+
+    function fail() public pure {
+        revert("This function always fails.");
+    }
+
+}
