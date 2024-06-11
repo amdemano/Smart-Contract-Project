@@ -1,24 +1,60 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+    // SPDX-License-Identifier: MIT
+    pragma solidity ^0.8.0;
 
-contract ExampleContract {
-
-    uint256 public data;
-
-    function setData(uint256 _data) public {
-        require(_data > 0, "Data must be greater than zero.");
-        data = _data;
+    contract GradingSystem {
+    struct Student {
+        string name;
+        uint8 grade;
     }
 
-    function divide(uint256  _a, uint256  _b) public pure returns (uint256){
-        require(_b > 0, "Division by zero is not allowed.");
-        uint256 result = _a / _b;
-        assert((result * _b) == _a);
-        return result;
+    Student[] public students;
+
+    function addStudent(string memory _name, uint8 _grade) public {
+        // Require that the grade is between 0 and 100
+        require(_grade >= 0 && _grade <= 100, "Invalid grade. Grade must be between 0 and 100.");
+
+        // Require that the student is not already in the system
+        require(getStudentIndex(_name) == type(uint256).max, "Student already exists.");
+
+        students.push(Student(_name, _grade));
     }
 
-    function fail() public pure {
-        revert("This function always fails.");
+    function updateGrade(string memory _name, uint8 _newGrade) public {
+        // Require that the new grade is between 0 and 100
+        require(_newGrade >= 0 && _newGrade <= 100, "Invalid new grade. New grade must be between 0 and 100.");
+
+        uint256 studentIndex = getStudentIndex(_name);
+
+        // Require that the student exists in the system
+        require(studentIndex < students.length, "Student not found.");
+
+        // Assert that the student's current grade is not already the new grade
+        assert(students[studentIndex].grade!= _newGrade);
+
+        students[studentIndex].grade = _newGrade;
     }
 
+    function deleteStudent(string memory _name) public {
+        uint256 studentIndex = getStudentIndex(_name);
+
+        // Require that the student exists in the system
+        require(studentIndex < students.length, "Student not found.");
+
+        // Revert the deletion if the student's grade is not 0
+        if (students[studentIndex].grade!= 0) {
+            revert("Cannot delete student with non-zero grade.");
+        }
+
+        students[studentIndex] = students[students.length - 1];
+        students.pop();
+    }
+
+    function getStudentIndex(string memory _name) public view returns (uint256) {
+        for (uint256 i = 0; i < students.length; i++) {
+            if (keccak256(abi.encodePacked(students[i].name)) == keccak256(abi.encodePacked(_name))) {
+                return i;
+            }
+        }
+        return type(uint256).max;
+    }
 }
