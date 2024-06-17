@@ -1,60 +1,90 @@
-    // SPDX-License-Identifier: MIT
-    pragma solidity ^0.8.0;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-    contract GradingSystem {
-    struct Student {
-        string name;
-        uint8 grade;
+contract RideHailingSystem {
+    address public admin;
+
+    enum RideStatus { Requested, Accepted, Completed }
+
+    struct Ride {
+        address passenger;
+        address driver;
+        uint256 fare;
+        RideStatus status;
     }
 
-    Student[] public students;
+    mapping(address => bool) private registeredDrivers;
+    mapping(uint256 => Ride) private rides;
+    uint256 private rideCounter;
 
-    function addStudent(string memory _name, uint8 _grade) public {
-        // Require that the grade is between 0 and 100
-        require(_grade >= 0 && _grade <= 100, "Invalid grade. Grade must be between 0 and 100.");
-
-        // Require that the student is not already in the system
-        require(getStudentIndex(_name) == type(uint256).max, "Student already exists.");
-
-        students.push(Student(_name, _grade));
+    constructor() {
+        admin = msg.sender;
     }
 
-    function updateGrade(string memory _name, uint8 _newGrade) public {
-        // Require that the new grade is between 0 and 100
-        require(_newGrade >= 0 && _newGrade <= 100, "Invalid new grade. New grade must be between 0 and 100.");
-
-        uint256 studentIndex = getStudentIndex(_name);
-
-        // Require that the student exists in the system
-        require(studentIndex < students.length, "Student not found.");
-
-        // Assert that the student's current grade is not already the new grade
-        assert(students[studentIndex].grade!= _newGrade);
-
-        students[studentIndex].grade = _newGrade;
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Not the admin");
+        _;
     }
 
-    function deleteStudent(string memory _name) public {
-        uint256 studentIndex = getStudentIndex(_name);
-
-        // Require that the student exists in the system
-        require(studentIndex < students.length, "Student not found.");
-
-        // Revert the deletion if the student's grade is not 0
-        if (students[studentIndex].grade!= 0) {
-            revert("Cannot delete student with non-zero grade.");
-        }
-
-        students[studentIndex] = students[students.length - 1];
-        students.pop();
+    modifier onlyDriver() {
+        require(registeredDrivers[msg.sender], "Not a registered driver");
+        _;
     }
 
-    function getStudentIndex(string memory _name) public view returns (uint256) {
-        for (uint256 i = 0; i < students.length; i++) {
-            if (keccak256(abi.encodePacked(students[i].name)) == keccak256(abi.encodePacked(_name))) {
-                return i;
-            }
-        }
-        return type(uint256).max;
+    modifier validRide(uint256 _rideId) {
+        require(_rideId < rideCounter, "Invalid ride ID");
+        _;
+    }
+
+    function registerDriver(address _driver) public onlyAdmin {
+        require(_driver != address(0), "Invalid address");
+        registeredDrivers[_driver] = true;
+    }
+
+    function requestRide(uint256 _fare) public returns (uint256) {
+        require(_fare > 0, "Fare must be greater than zero");
+
+        rides[rideCounter] = Ride({
+            passenger: msg.sender,
+            driver: address(0),
+            fare: _fare,
+            status: RideStatus.Requested
+        });
+
+        rideCounter++;
+        return rideCounter - 1;
+    }
+
+    function acceptRide(uint256 _rideId) public onlyDriver validRide(_rideId) {
+        Ride storage ride = rides[_rideId];
+        require(ride.status == RideStatus.Requested, "Ride is not available for acceptance");
+        ride.driver = msg.sender;
+        ride.status = RideStatus.Accepted;
+    }
+
+    function completeRide(uint256 _rideId) public onlyDriver validRide(_rideId) {
+        Ride storage ride = rides[_rideId];
+        require(ride.status == RideStatus.Accepted, "Ride is not in progress");
+        require(ride.driver == msg.sender, "Only the assigned driver can complete the ride");
+
+        ride.status = RideStatus.Completed;
+    }
+
+    function getRideDetails(uint256 _rideId) public view validRide(_rideId) returns (address, address, uint256, RideStatus) {
+        Ride storage ride = rides[_rideId];
+        return (ride.passenger, ride.driver, ride.fare, ride.status);
+    }
+
+    function triggerAssert(uint256 _rideId) public view validRide(_rideId) {
+        // This assertion will fail if the ride has not been requested
+        assert(rides[_rideId].status == RideStatus.Requested);
+    }
+
+    function triggerRevert() public pure {
+        revert("This is a forced revert");
+    }
+
+    function close() public onlyAdmin {
+        selfdestruct(payable(admin));
     }
 }
